@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 44" fill="none">
+  <defs>
+    <linearGradient id="iconGrad" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#C9768A"/>
+      <stop offset="100%" stop-color="#7A3D50"/>
+    </linearGradient>
+    <linearGradient id="pulseGrad" x1="0" y1="0" x2="44" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8B4C0" stop-opacity="0.4"/>
+      <stop offset="50%" stop-color="#FFFFFF" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#E8B4C0" stop-opacity="0.4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon background -->
+  <rect width="44" height="44" rx="12" fill="url(#iconGrad)"/>
+  <rect x="1" y="1" width="42" height="42" rx="11.5" stroke="white" stroke-opacity="0.15" stroke-width="1" fill="none"/>
+
+  <!-- Heartbeat pulse line through icon -->
+  <polyline
+    points="3,22 9,22 12,15 16,29 20,11 24,33 28,22 34,22 41,22"
+    stroke="url(#pulseGrad)"
+    stroke-width="2.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+
+  <!-- Wordmark: Her -->
+  <text
+    x="53"
+    y="21"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="16"
+    font-weight="400"
+    fill="#2C1F27"
+    letter-spacing="0.4"
+  >Her</text>
+
+  <!-- Wordmark: Care -->
+  <text
+    x="77"
+    y="21"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="16"
+    font-weight="700"
+    fill="#9E4F63"
+    letter-spacing="0.4"
+  >Care</text>
+
+  <!-- Divider line -->
+  <line x1="53" y1="26.5" x2="118" y2="26.5" stroke="#D4BFA8" stroke-width="0.7" opacity="0.9"/>
+
+  <!-- Tagline -->
+  <text
+    x="53"
+    y="37"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="6.2"
+    fill="#A08898"
+    letter-spacing="2.4"
+  >HORMONAL HEALTH</text>
+</svg>
