@@ -1,4 +1,4 @@
-# 🌸 HerBalance – Setup Guide
+# HerCare – Setup Guide
 
 ## What you get
 | File | Purpose |
@@ -9,7 +9,7 @@
 
 ---
 
-## ⚙️ Backend Setup (YOU need to do this)
+## Backend Setup
 
 ### Step 1 – Install Python dependencies
 ```bash
@@ -24,8 +24,8 @@ python app.py
 ```
 You should see:
 ```
-✅ Database initialised.
-🌸 HerBalance backend running on http://localhost:5000
+Database initialised.
+HerCare backend running on http://localhost:5000
 ```
 
 ### Step 3 – Run the frontend
@@ -42,7 +42,7 @@ npm run dev
 
 ---
 
-## 🗄️ Database
+## Database
 SQLite file `herbalance.db` is created automatically in the same folder as `app.py`.
 
 Tables created:
@@ -53,7 +53,7 @@ Tables created:
 
 ---
 
-## 🚀 API Endpoints
+## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
