@@ -1,7 +1,19 @@
 import { useState, useEffect, useRef } from "react";
-import hercareLogo from "./assets/logo.svg";
+import logoLight from "./assets/logo-light.svg";
+import logoDark from "./assets/logo-dark.svg";
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
+  ResponsiveContainer, ReferenceLine, BarChart, Bar, Legend, Cell
+} from "recharts";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+
+
+// import { GoogleLogin } from "@react-oauth/google";
+import { useGoogleLogin } from "@react-oauth/google";
 
 const API = "http://localhost:5000";
+
 
 /* ─────────────────────────── GLOBAL STYLES ─────────────────────────── */
 const GlobalStyles = () => (
@@ -152,9 +164,33 @@ const GlobalStyles = () => (
       letter-spacing: 0.3px;
       color: var(--text);
     }
+      
     .logo-text span { color: var(--rose); }
+    body.dark .logo-text {
+  color: #ffffff !important;
+}
+
+body.dark .logo-text span {
+  color: var(--rose-light) !important;
+}
+body.dark .display,
+body.dark .page-title {
+  color: #ffffff;
+}
+  body.dark .display,
+body.dark .page-title {
+  color: #ffffff;
+}
 
     /* ── NAV ITEMS ── */
+    body.dark .nav-item {
+  color: var(--text-mid);
+}
+
+body.dark .nav-item.active {
+  color: var(--rose-light);
+  background: rgba(255,255,255,0.05);
+}
     .nav-section-label {
       font-size: 10px;
       font-weight: 600;
@@ -671,6 +707,211 @@ const GlobalStyles = () => (
       width: 9px; height: 9px;
       border-radius: 50%;
     }
+      body.dark {
+  --cream:       #1E1A1D;
+  --cream-dark:  #2A2428;
+
+  --text:        #FFFFFF;        /* 🔥 pure white */
+  --text-mid:    #E0D0D6;
+  --text-soft:   #BFAAB2;
+
+  --white:       #2A2428;
+  --border:      rgba(255,255,255,0.08);
+
+  /* 💅 better pink shades */
+  --rose:        #E89AB0;        /* lighter pink */
+  --rose-light:  #F2B8C6;
+  --rose-pale:   #3A2A30;
+
+  --sage-pale:   #2A3A30;
+}
+  body.dark .btn {
+  color: var(--text);
+}
+  body.dark .input {
+  color: var(--text);
+  background: var(--cream-dark);
+}
+  body.dark {
+  color: var(--text);
+}
+
+body.dark * {
+  color: var(--text);
+}
+  /* 🔥 INPUT FIX */
+body.dark input,
+body.dark select,
+body.dark textarea {
+  background: #2A2428;   /* darker background */
+  color: #ffffff;        /* white text */
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+/* placeholder text */
+body.dark input::placeholder,
+body.dark textarea::placeholder {
+  color: #BFAAB2;
+}
+  body.dark label,
+body.dark .label {
+  color: #EADDE1;
+}
+  body.dark .section-title {
+  color: #EADDE1;
+}
+  .card {
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+body.dark .card {
+  background: #2A2428;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.chart-card {
+  background: var(--card-bg, #fff);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.05);
+
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+
+  min-height: 300px; /* 🔥 IMPORTANT */
+}
+
+body.dark .chart-card {
+  background: #2A2428;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+body.dark .chart-card {
+  background: #2A2428;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.chart-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.chart-header p {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.chart-container {
+  margin-top: 12px;
+}
+  .dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+  .heatmap-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.heatmap-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.heat-cell {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+}
+  .dashboard-container {
+  padding: 20px;
+  width: 100%;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+/* mobile */
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+  .heatmap-grid {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.heatmap-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.label {
+  width: 120px;
+  font-size: 13px;
+  color: #666;
+}
+
+body.dark .label {
+  color: #ccc;
+}
+  .chart-header {
+  margin-bottom: 10px;
+}
+
+.chart-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.chart-header p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #888;
+}
+  .report-section {
+  margin-bottom: 30px;
+}
+
+.report-section h2 {
+  margin-bottom: 10px;
+  font-size: 18px;
+}
+
+.stats-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.report-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
   `}</style>
 );
 
@@ -689,6 +930,7 @@ const Icon = ({ name, size = 16, color = "currentColor" }) => {
     info: <><circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.5" fill="none"/><line x1="12" y1="8" x2="12" y2="12" stroke={color} strokeWidth="1.5"/><line x1="12" y1="16" x2="12.01" y2="16" stroke={color} strokeWidth="2"/></>,
     heart: <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke={color} strokeWidth="1.5" fill="none"/>,
     chevron: <path d="M6 9l6 6 6-6" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>,
+    sun:     <><circle cx="12" cy="12" r="5" stroke={color} strokeWidth="1.5" fill="none"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke={color} strokeWidth="1.5" strokeLinecap="round"/></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
@@ -698,29 +940,58 @@ const Icon = ({ name, size = 16, color = "currentColor" }) => {
 };
 
 /* ──────────────────────────── LOGO COMPONENT ─────────────────────────────── */
-const Logo = ({ light = false }) => (
+const Logo = ({ darkMode }) => (
   <div className="logo">
     <img
-      src={hercareLogo}
-      alt="HerCare"
+      src={darkMode ? logoDark : logoLight}
+      alt="Her Care"
       style={{
         height: 36,
-        filter: light ? "brightness(0) invert(1)" : "none",
-        transition: "filter 0.2s",
+        transition: "all 0.3s ease"
       }}
     />
   </div>
 );
 
 /* ─────────────────────────── AUTH PAGE ───────────────────────────────────── */
-function AuthPage({ onLogin }) {
+function AuthPage({ onLogin,darkMode }) {
   const [mode, setMode] = useState("login");
   const [form, setForm] = useState({ name: "", email: "", password: "", age: "", conditions: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+  const googleLogin = useGoogleLogin({
+  flow: "implicit",
+  onSuccess: async (tokenResponse) => {
+    try {
+      const res = await fetch(API + "/api/google-login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          token: tokenResponse.access_token,
+        }),
+      });
 
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Google login failed");
+        return;
+      }
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      onLogin(data.user);
+
+    } catch {
+      setError("Google login failed");
+    }
+  },
+  onError: () => setError("Google login failed"),
+});
   const handleSubmit = async () => {
     setLoading(true); setError("");
     try {
@@ -747,7 +1018,7 @@ function AuthPage({ onLogin }) {
       <div className="auth-shell">
         {/* Left panel */}
         <div className="auth-left">
-          <Logo light />
+          <Logo darkMode={darkMode} />
           <div style={{ position: "relative", zIndex: 1 }}>
             <p className="auth-quote">
               Your body tells<br />a story. Let's <em>listen</em><br />together.
@@ -774,7 +1045,9 @@ function AuthPage({ onLogin }) {
                 {mode === "login" ? "Sign in to continue your health journey." : "Join HerCare and begin tracking today."}
               </p>
             </div>
+            <div style={{ marginTop: 20 }}>
 
+</div>
             {/* Toggle */}
             <div className="tab-bar mb24">
               <button className={`tab-btn ${mode === "login" ? "active" : ""}`} onClick={() => setMode("login")}>Sign In</button>
@@ -808,6 +1081,8 @@ function AuthPage({ onLogin }) {
                   onKeyDown={e => e.key === "Enter" && handleSubmit()} />
               </div>
             </div>
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 20 }}>
+</div>
 
             {error && (
               <div className="notice notice-rose mt16">
@@ -818,6 +1093,34 @@ function AuthPage({ onLogin }) {
             <button className="btn btn-primary btn-full" style={{ marginTop: 24 }} onClick={handleSubmit} disabled={loading}>
               {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
             </button>
+            <p style={{ textAlign: "center", marginTop: 16 }}>
+  — or continue with —
+            </p>
+            
+
+<div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+  <button
+    onClick={() => googleLogin()}
+    style={{
+      width: 48,
+      height: 48,
+      borderRadius: "50%",
+      border: "1px solid var(--border)",
+      background: "var(--white)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+      boxShadow: "0 6px 16px rgba(0,0,0,0.08)",
+    }}
+  >
+    <img
+      src="https://cdn-icons-png.flaticon.com/512/2991/2991148.png"
+      alt="Google"
+      style={{ width: 22, height: 22 }}
+    />
+  </button>
+</div>
 
             <div className="notice notice-sage mt20">
               <strong style={{ display: "block", marginBottom: 4 }}>Backend required</strong>
@@ -830,89 +1133,302 @@ function AuthPage({ onLogin }) {
   );
 }
 
+/* ──────────────────────────── CHART COMPONENTS ──────────────────────────────────── */
+
+function HemoglobinChart({ data }) {
+  const filtered = (data || []).filter(d => d.value != null);
+  const chartData = filtered.length > 0
+    ? filtered.map(d => ({ date: (d.date || "").slice(0, 7), value: parseFloat(d.value) }))
+    : [{ date: "Oct 1", value: 11.2 }, { date: "Jan 15", value: 11.9 }, { date: "Apr 1", value: 12.8 }];
+  return (
+    <div className="card" style={{ height: "100%" }}>
+      <div className="card-body" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>Hemoglobin Trend</div>
+        <div style={{ fontSize: 12, color: "var(--text-soft)", marginBottom: 14 }}>Normal range: 12.0 — 15.5 g/dL</div>
+        <div style={{ flex: 1, minHeight: 200 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(160,136,152,0.15)" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#A08898" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "#A08898" }} axisLine={false} tickLine={false} domain={["auto","auto"]} />
+              <Tooltip contentStyle={{ border: "1px solid var(--border)", borderRadius: 10, fontSize: 12, background: "var(--white)" }} />
+              <ReferenceLine y={12}   stroke="#8FAF96" strokeDasharray="4 4" strokeWidth={1.5} />
+              <ReferenceLine y={15.5} stroke="#8FAF96" strokeDasharray="4 4" strokeWidth={1.5} />
+              <Line type="monotone" dataKey="value" stroke="#C9768A" strokeWidth={2.5} dot={{ r: 4, fill: "#C9768A", strokeWidth: 0 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CycleLengthChart({ data }) {
+  const filtered = (data || []).filter(d => d.cycle_length);
+  const chartData = filtered.length > 0
+    ? filtered.slice(0, 6).reverse().map(d => ({ date: (d.date || "").slice(0, 7), length: d.cycle_length }))
+    : [{ date: "Nov 25", length: 26 }, { date: "Dec 25", length: 31 }, { date: "Jan 26", length: 29 }, { date: "Feb 26", length: 29 }, { date: "Mar 26", length: 30 }, { date: "Mar 26", length: 28 }];
+  return (
+    <div className="card" style={{ height: "100%" }}>
+      <div className="card-body" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>Cycle Length</div>
+        <div style={{ fontSize: 12, color: "var(--text-soft)", marginBottom: 14 }}>Last 6 cycles</div>
+        <div style={{ flex: 1, minHeight: 200 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(160,136,152,0.15)" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#A08898" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "#A08898" }} axisLine={false} tickLine={false} domain={[0,"auto"]} />
+              <Tooltip contentStyle={{ border: "1px solid var(--border)", borderRadius: 10, fontSize: 12, background: "var(--white)" }} />
+              <ReferenceLine y={28} stroke="#C9768A" strokeDasharray="4 4" strokeWidth={1.5} />
+              <Bar dataKey="length" fill="#9B59B6" radius={[5,5,0,0]} maxBarSize={48} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SymptomHeatmap({ data }) {
+  const WEEKS = ["Feb 15","Feb 22","Mar 1","Mar 8","Mar 15","Mar 22","Mar 29","Apr 5"];
+  const ROWS  = ["Fatigue","Cramps","Mood Swings","Headache","Bloating","Back Pain","Breast Tenderness","Insomnia"];
+  const grid  = {};
+  ROWS.forEach(s => { grid[s] = {}; WEEKS.forEach(w => { grid[s][w] = 0; }); });
+  if (data && data.length > 0) {
+    data.forEach(entry => {
+      const sym = entry.symptoms || entry.symptom || "";
+      const idx = Math.min(Math.floor((Date.now() - new Date(entry.date)) / (7*86400000)), WEEKS.length - 1);
+      const wk  = WEEKS[Math.max(0, idx)];
+      sym.split(", ").forEach(s => { if (grid[s] && wk) grid[s][wk] = (grid[s][wk]||0) + (entry.intensity||1); });
+    });
+  } else {
+    grid["Fatigue"]["Mar 15"]=4; grid["Fatigue"]["Mar 29"]=3; grid["Fatigue"]["Apr 5"]=3;
+    grid["Cramps"]["Mar 15"]=3; grid["Cramps"]["Mar 22"]=4;
+    grid["Mood Swings"]["Mar 8"]=2; grid["Mood Swings"]["Apr 5"]=3;
+    grid["Headache"]["Mar 29"]=2; grid["Bloating"]["Apr 5"]=2;
+    grid["Breast Tenderness"]["Mar 22"]=2; grid["Insomnia"]["Mar 22"]=3;
+  }
+  const getColor = v => {
+    if (!v) return "rgba(201,118,138,0.08)";
+    return `rgba(201,118,138,${Math.min(0.2 + (v/5)*0.75, 1)})`;
+  };
+  return (
+    <div className="card" style={{ height: "100%" }}>
+      <div className="card-body" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>Symptom Heatmap</div>
+        <div style={{ fontSize: 12, color: "var(--text-soft)", marginBottom: 14 }}>Last 8 weeks · Intensity by week</div>
+        <div style={{ flex: 1, overflowX: "auto" }}>
+          <table style={{ borderCollapse: "separate", borderSpacing: 4, width: "100%" }}>
+            <thead>
+              <tr>
+                <th style={{ width: 130, textAlign: "right", paddingRight: 8, fontSize: 10, color: "var(--text-soft)", fontWeight: 500 }}></th>
+                {WEEKS.map(w => <th key={w} style={{ fontSize: 10, color: "var(--text-soft)", fontWeight: 500, textAlign: "center", padding: "2px 3px" }}>{w}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {ROWS.map(sym => (
+                <tr key={sym}>
+                  <td style={{ fontSize: 12, color: "var(--text-mid)", textAlign: "right", paddingRight: 8, whiteSpace: "nowrap" }}>{sym}</td>
+                  {WEEKS.map(w => (
+                    <td key={w} style={{ textAlign: "center", padding: 2 }}>
+                      <span style={{ display: "inline-block", width: 26, height: 26, borderRadius: 6, background: getColor(grid[sym][w]), transition: "transform 0.15s", cursor: "default" }} title={`${sym}: ${grid[sym][w]||0}`} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SymptomCycleChart({ data }) {
+  const topSymptoms = ["Fatigue","Cramps","Mood Swings","Headache","Bloating"];
+  const colors = ["#C9768A","#9B59B6","#3498DB","#E67E22","#27AE60"];
+  const chartData = [
+    { phase: "Menstrual",  Fatigue: 2, Cramps: 2, "Mood Swings": 0, Headache: 0, Bloating: 0 },
+    { phase: "Follicular", Fatigue: 0, Cramps: 0, "Mood Swings": 0, Headache: 0, Bloating: 0 },
+    { phase: "Ovulation",  Fatigue: 0, Cramps: 0, "Mood Swings": 1, Headache: 0, Bloating: 0 },
+    { phase: "Luteal",     Fatigue: 1, Cramps: 0, "Mood Swings": 1, Headache: 1, Bloating: 1 },
+  ];
+  return (
+    <div className="card" style={{ height: "100%" }}>
+      <div className="card-body" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>Symptoms by Cycle Phase</div>
+        <div style={{ fontSize: 12, color: "var(--text-soft)", marginBottom: 14 }}>Top symptoms grouped by phase</div>
+        <div style={{ flex: 1, minHeight: 200 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(160,136,152,0.15)" vertical={false} />
+              <XAxis dataKey="phase" tick={{ fontSize: 11, fill: "#A08898" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "#A08898" }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ border: "1px solid var(--border)", borderRadius: 10, fontSize: 12, background: "var(--white)" }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+              {topSymptoms.map((s, i) => <Bar key={s} dataKey={s} stackId="a" fill={colors[i]} maxBarSize={60} radius={i === topSymptoms.length - 1 ? [4,4,0,0] : [0,0,0,0]} />)}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ──────────────────────────── DASHBOARD ──────────────────────────────────── */
 function Dashboard({ user }) {
   const [stats, setStats] = useState({ symptoms_logged: 0, cycle_days: 28, reports: 0, flags: 0 });
-  const [recent, setRecent] = useState([]);
-  const [flags, setFlags] = useState([]);
+  const [insights, setInsights] = useState([]);
+  const [recent, setRecent]   = useState([]);
+  const [flags, setFlags]     = useState([]);
+  const [reports, setReports] = useState([]);
+  const [cycles, setCycles]   = useState([]);
+  const [symptoms, setSymptoms] = useState([]);
+  const token = localStorage.getItem("token");
+ 
+const exportPDF = async () => {
+  const element = document.getElementById("report-area");
+
+  if (!element) return;
+
+  const canvas = await html2canvas(element, {
+    scale: 2, // better quality
+    useCORS: true
+  });
+
+  const imgData = canvas.toDataURL("image/png");
+
+  const pdf = new jsPDF("p", "mm", "a4");
+
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const imgWidth = pageWidth - 20;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+  pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
+
+  pdf.save("HerBalance_Report.pdf");
+};
 
   useEffect(() => {
-    const h = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+    const h = { Authorization: `Bearer ${token}` };
     fetch(API + "/api/dashboard", { headers: h })
-      .then(r => r.json())
-      .then(d => {
-        if (d.stats) setStats(d.stats);
-        if (d.recent_symptoms) setRecent(d.recent_symptoms);
-        if (d.flags) setFlags(d.flags);
-      })
+      .then(async r => { if (r.status === 401) { localStorage.clear(); window.location.reload(); } return r.json(); })
+      .then(d => { if (d.stats) setStats(d.stats); if (d.recent_symptoms) setRecent(d.recent_symptoms); if (d.flags) setFlags(d.flags); })
       .catch(() => {
         setStats({ symptoms_logged: 12, cycle_days: 28, reports: 3, flags: 2 });
-        setRecent([
-          { date: "2025-01-10", symptoms: "Fatigue, Headache", intensity: 3 },
-          { date: "2025-01-09", symptoms: "Cramps, Bloating", intensity: 4 },
-        ]);
-        setFlags([
-          { type: "warning", title: "Irregular Cycle Detected", desc: "Your last cycle was 38 days. Normal is 21–35 days." },
-          { type: "info", title: "Hemoglobin Below Threshold", desc: "Last reported Hb: 10.2 g/dL. Consider consulting your doctor." },
-        ]);
+        setRecent([{ date: "2025-01-10", symptoms: "Fatigue, Headache", intensity: 3 }, { date: "2025-01-09", symptoms: "Cramps, Bloating", intensity: 4 }]);
+        setFlags([{ type: "warning", title: "Irregular Cycle Detected", desc: "Your last cycle was 38 days. Normal is 21–35 days." }, { type: "info", title: "Hemoglobin Below Threshold", desc: "Last reported Hb: 10.2 g/dL. Consider consulting your doctor." }]);
       });
+    fetch(API + "/api/reports",  { headers: h }).then(r => r.json()).then(d => setReports(d.reports   || [])).catch(() => {});
+    fetch(API + "/api/cycle",    { headers: h }).then(r => r.json()).then(d => setCycles(d.cycles     || [])).catch(() => {});
+    fetch(API + "/api/symptoms", { headers: h }).then(r => r.json()).then(d => setSymptoms(d.symptoms || [])).catch(() => {});
   }, []);
 
+  const hemoglobinData = reports.map(r => ({ date: r.test_date, value: r.hemoglobin }));
+  const cycleData      = cycles.map(c  => ({ date: c.last_period_date, cycle_length: c.cycle_length }));
+  useEffect(() => {
+    if (!token) return;
+
+    fetch(API + "/api/reports", {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => setReports(data.reports || []))
+      .catch(() => setReports([]));
+  }, [token]);
   const statData = [
-    { label: "Symptoms Logged", value: stats.symptoms_logged, bg: "#FBF0F3", icon: "clipboard", iconColor: "var(--rose)" },
-    { label: "Avg Cycle Length", value: `${stats.cycle_days}d`, bg: "#EFF6F1", icon: "moon", iconColor: "var(--sage)" },
-    { label: "Lab Reports", value: stats.reports, bg: "#F5F0EB", icon: "flask", iconColor: "var(--sand)" },
-    { label: "Health Flags", value: stats.flags, bg: "#FBF0F3", icon: "flag", iconColor: "var(--rose)" },
+    { label: "Symptoms Logged",  value: stats.symptoms_logged,    bg: "#FBF0F3", icon: "clipboard", iconColor: "var(--rose)" },
+    { label: "Avg Cycle Length", value: `${stats.cycle_days}d`,   bg: "#EFF6F1", icon: "moon",      iconColor: "var(--sage)" },
+    { label: "Lab Reports",      value: stats.reports,            bg: "#F5F0EB", icon: "flask",     iconColor: "var(--sand)" },
+    { label: "Health Flags",     value: stats.flags,              bg: "#FBF0F3", icon: "flag",      iconColor: "var(--rose)" },
   ];
 
   return (
     <div className="animate-fade-up">
-      {/* Hero */}
-      <div className="hero-banner mb28">
+      <div className="hero-banner">
         <div style={{ position: "relative", zIndex: 1 }}>
-          <p style={{ fontSize: 12, fontWeight: 400, color: "rgba(255,255,255,0.5)", letterSpacing: "1.2px", textTransform: "uppercase", marginBottom: 10 }}>
+          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", letterSpacing: "1.2px", textTransform: "uppercase", marginBottom: 8 }}>
             {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}
           </p>
-          <h1 className="display display-lg" style={{ color: "white", marginBottom: 8 }}>
-            Hello, {user?.name?.split(" ")[0] || "there"}.
-          </h1>
-          <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 15, fontWeight: 300, maxWidth: 420 }}>
-            Your health, tracked with care. Here's a summary of what we know so far.
-          </p>
+          <h1 className="display display-lg" style={{ color: "white", marginBottom: 6 }}>Hello, {user?.name?.split(" ")[0] || "there"}.</h1>
+          <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 14, fontWeight: 300, maxWidth: 420 }}>Your health, tracked with care. Here's a summary of what we know so far.</p>
         </div>
       </div>
 
-      {/* Stats */}
       <div className="stat-grid">
         {statData.map((s, i) => (
-          <div key={i} className="stat-card" style={{ animationDelay: `${i * 0.08}s` }}>
-            <div className="stat-icon-wrap" style={{ background: s.bg }}>
-              <Icon name={s.icon} size={18} color={s.iconColor} />
-            </div>
+          <div key={i} className="stat-card">
+            <div className="stat-icon-wrap" style={{ background: s.bg }}><Icon name={s.icon} size={17} color={s.iconColor} /></div>
             <div className="stat-value">{s.value}</div>
             <div className="stat-label">{s.label}</div>
           </div>
         ))}
       </div>
+      <div id="report-area">
+
+  {/* 🧾 HEADER */}
+  <div className="report-header">
+    <h1>HerBalance Health Report</h1>
+    <p>Date: {new Date().toLocaleDateString()}</p>
+  </div>
+
+  {/* 📊 STATS */}
+  <div className="report-section">
+    <h2>Summary</h2>
+    <div className="stats-row">
+      <p>Symptoms Logged: {stats.symptoms_logged}</p>
+      <p>Avg Cycle Length: {stats.cycle_days} days</p>
+      <p>Reports: {stats.reports}</p>
+    </div>
+  </div>
+
+  {/* 📈 CHARTS */}
+  <div className="report-section">
+    <h2>Health Trends</h2>
+
+    <HemoglobinChart data={hemoglobinData} />
+    <CycleLengthChart data={cycleData} />
+    <SymptomHeatmap data={symptoms} />
+    <SymptomCycleChart data={symptoms} />
+  </div>
+
+  {/* 🧠 INSIGHTS */}
+  <div className="report-section">
+    <h2>Insights</h2>
+
+    {insights.length === 0 ? (
+      <p>No insights available</p>
+    ) : (
+      insights.map((i, idx) => (
+        <InsightCard key={idx} item={i} />
+      ))
+    )}
+  </div>
+
+</div>
+<button className="btn btn-primary" onClick={exportPDF}>
+  Download Report
+</button>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 18, minHeight: 300 }}>
+        <HemoglobinChart data={hemoglobinData} />
+        <CycleLengthChart data={cycleData} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 24, minHeight: 320 }}>
+        <SymptomHeatmap data={symptoms} />
+        <SymptomCycleChart data={symptoms} />
+      </div>
 
       <div className="g2">
-        {/* Flags */}
         <div className="card">
           <div className="card-body">
             <p className="section-label">Health Flags</p>
             <p className="display display-sm mb20" style={{ fontWeight: 400 }}>What to watch</p>
             {flags.length === 0 ? (
-              <div className="flag-card flag-good">
-                <Icon name="check" size={18} color="var(--sage)" />
-                <div>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: "#3d6647", marginBottom: 3 }}>No concerns detected</p>
-                  <p style={{ fontSize: 13, color: "var(--text-soft)" }}>Keep logging for better insights.</p>
-                </div>
-              </div>
+              <div className="flag-card flag-good"><Icon name="check" size={17} color="var(--sage)" /><div><p style={{ fontSize: 14, fontWeight: 500, color: "#3d6647", marginBottom: 3 }}>No concerns detected</p><p style={{ fontSize: 13, color: "var(--text-soft)" }}>Keep logging for better insights.</p></div></div>
             ) : flags.map((f, i) => (
               <div key={i} className={`flag-card ${f.type === "warning" ? "flag-warn" : f.type === "danger" ? "flag-danger" : "flag-info"}`}>
-                <Icon name={f.type === "info" ? "info" : "alert"} size={17}
-                  color={f.type === "warning" ? "#D4954A" : f.type === "danger" ? "#C05555" : "var(--rose)"} />
+                <Icon name={f.type === "info" ? "info" : "alert"} size={16} color={f.type === "warning" ? "#D4954A" : f.type === "danger" ? "#C05555" : "var(--rose)"} />
                 <div>
                   <p style={{ fontSize: 13.5, fontWeight: 500, marginBottom: 3 }}>{f.title}</p>
                   <p style={{ fontSize: 13, color: "var(--text-soft)", lineHeight: 1.5 }}>{f.desc}</p>
@@ -921,29 +1437,22 @@ function Dashboard({ user }) {
             ))}
           </div>
         </div>
-
-        {/* Recent symptoms */}
         <div className="card">
           <div className="card-body">
             <p className="section-label">Recent Activity</p>
             <p className="display display-sm mb20" style={{ fontWeight: 400 }}>Symptom log</p>
-            {recent.length === 0 ? (
-              <p style={{ fontSize: 13.5, color: "var(--text-soft)" }}>No symptoms logged yet.</p>
-            ) : recent.map((r, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "13px 0", borderBottom: i < recent.length - 1 ? "1px solid var(--cream)" : "none" }}>
-                <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text)", marginBottom: 4 }}>
-                    {r.symptoms}
+            {recent.length === 0 ? <p style={{ fontSize: 13.5, color: "var(--text-soft)" }}>No symptoms logged yet.</p>
+              : recent.map((r, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "12px 0", borderBottom: i < recent.length - 1 ? "1px solid var(--cream)" : "none" }}>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 500, marginBottom: 3 }}>{r.symptoms || r.symptom}</div>
+                    <div style={{ fontSize: 12, color: "var(--text-soft)" }}>{r.date}</div>
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--text-soft)" }}>{r.date}</div>
+                  <div style={{ display: "flex", gap: 3 }}>
+                    {[1,2,3,4,5].map(n => <div key={n} style={{ width: 7, height: 7, borderRadius: 2, background: n <= r.intensity ? "var(--rose)" : "var(--cream-dark)" }} />)}
+                  </div>
                 </div>
-                <div style={{ display: "flex", gap: 3 }}>
-                  {[1,2,3,4,5].map(n => (
-                    <div key={n} style={{ width: 7, height: 7, borderRadius: 2, background: n <= r.intensity ? "var(--rose)" : "var(--cream-dark)" }} />
-                  ))}
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
       </div>
@@ -960,6 +1469,8 @@ const SYMPTOMS = [
 ];
 
 function SymptomLog({ showToast }) {
+  const [bodyLocation, setBodyLocation] = useState("");
+const [timeOfDay, setTimeOfDay] = useState("");
   const [selected, setSelected] = useState([]);
   const [intensity, setIntensity] = useState(3);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -970,7 +1481,15 @@ function SymptomLog({ showToast }) {
 
   useEffect(() => {
     fetch(API + "/api/symptoms", { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
+      .then(async r => {
+        
+  if (r.status === 401) {
+    localStorage.clear();
+    window.location.reload();
+    return;
+  }
+  return r.json();
+})
       .then(d => setHistory(d.symptoms || []))
       .catch(() => setHistory([
         { id: 1, date: "2025-01-10", symptoms: "Fatigue, Headache", intensity: 3, notes: "Stressful week" },
@@ -987,7 +1506,14 @@ function SymptomLog({ showToast }) {
       const res = await fetch(API + "/api/symptoms", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ date, symptoms: selected.join(", "), intensity, notes }),
+        body: JSON.stringify({
+  date,
+  symptoms: selected.join(", "),
+  intensity,
+  notes,
+  body_location: bodyLocation,
+  time_of_day: timeOfDay
+})
       });
       if (res.ok) {
         showToast("Symptoms saved.");
@@ -1039,7 +1565,19 @@ function SymptomLog({ showToast }) {
               <label className="field-label">Notes</label>
               <textarea className="input" rows={3} placeholder="Any additional context..." value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
+<select onChange={(e) => setBodyLocation(e.target.value)}>
+  <option value="">Select Body Location</option>
+  <option value="Head">Head</option>
+  <option value="Abdomen">Abdomen</option>
+  <option value="Back">Back</option>
+</select>
 
+<select onChange={(e) => setTimeOfDay(e.target.value)}>
+  <option value="">Time of Day</option>
+  <option value="Morning">Morning</option>
+  <option value="Afternoon">Afternoon</option>
+  <option value="Evening">Evening</option>
+</select>
             <button className="btn btn-primary btn-full" onClick={handleSubmit} disabled={loading}>
               {loading ? "Saving..." : "Save Entry"}
             </button>
@@ -1062,7 +1600,7 @@ function SymptomLog({ showToast }) {
                   </div>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {h.symptoms.split(", ").map(s => <span key={s} className="badge badge-rose">{s}</span>)}
+                  {(h.symptoms || "").split(", ").map(s => <span key={s} className="badge badge-rose">{s}</span>)}
                 </div>
                 {h.notes && <p style={{ fontSize: 12, color: "var(--text-soft)", marginTop: 6, fontStyle: "italic" }}>{h.notes}</p>}
               </div>
@@ -1082,7 +1620,14 @@ function CycleTracker({ showToast }) {
 
   useEffect(() => {
     fetch(API + "/api/cycle", { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
+      .then(async r => {
+  if (r.status === 401) {
+    localStorage.clear();
+    window.location.reload();
+    return;
+  }
+  return r.json();
+})
       .then(d => setHistory(d.cycles || []))
       .catch(() => setHistory([
         { last_period_date: "2025-01-01", cycle_length: 28, period_duration: 5, flow: "moderate" },
@@ -1091,22 +1636,40 @@ function CycleTracker({ showToast }) {
   }, []);
 
   const predictNext = (date, len) => {
-    const d = new Date(date); d.setDate(d.getDate() + parseInt(len));
-    return d.toISOString().slice(0, 10);
-  };
+  if (!date) return null;  // 🛑 FIX 1
+
+  const d = new Date(date);
+
+  if (isNaN(d)) return null;  // 🛑 FIX 2
+
+  d.setDate(d.getDate() + parseInt(len || 0));
+  return d.toISOString().slice(0, 10);
+};
 
   const handleSubmit = async () => {
-    const res = await fetch(API + "/api/cycle", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(form),
-    }).catch(() => null);
-    if (res?.ok) showToast("Cycle logged.");
-    else showToast("Demo mode — backend offline.", "warn");
-    setHistory(p => [form, ...p]);
-  };
+  if (!form.last_period_date) {
+    showToast("Please select a date first", "warn");
+    return;
+  }
 
-  const nextPeriod = history[0] ? predictNext(history[0].last_period_date, history[0].cycle_length) : null;
+  const res = await fetch(API + "/api/cycle", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(form),
+  }).catch(() => null);
+
+  if (res?.ok) showToast("Cycle logged.");
+  else showToast("Demo mode — backend offline.", "warn");
+
+  setHistory(p => [form, ...p]);
+};
+
+  const nextPeriod = history.length > 0 
+  ? predictNext(history[0].last_period_date, history[0].cycle_length) 
+  : null;
   const daysUntil = nextPeriod ? Math.max(0, Math.ceil((new Date(nextPeriod) - new Date()) / 86400000)) : null;
   const flowMap = { light: { bg: "var(--sage-pale)", color: "#4a7a54" }, moderate: { bg: "var(--rose-pale)", color: "var(--rose-deep)" }, heavy: { bg: "#FDE8E8", color: "#8B2020" } };
 
@@ -1213,13 +1776,6 @@ function LabReports({ showToast }) {
   const [form, setForm] = useState({ test_date: new Date().toISOString().slice(0, 10) });
   const [reports, setReports] = useState([]);
   const token = localStorage.getItem("token");
-
-  useEffect(() => {
-    fetch(API + "/api/reports", { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(d => setReports(d.reports || []))
-      .catch(() => setReports([{ test_date: "2025-01-05", hemoglobin: 10.2, tsh: 5.8, ferritin: 8 }]));
-  }, []);
 
   const status = (key, val) => {
     const p = LAB.find(l => l.key === key);
@@ -1330,7 +1886,14 @@ function HealthFlags() {
 
   useEffect(() => {
     fetch(API + "/api/health-flags", { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
+      .then(async r => {
+  if (r.status === 401) {
+    localStorage.clear();
+    window.location.reload();
+    return;
+  }
+  return r.json();
+})
       .then(d => setFlags(d.flags || []))
       .catch(() => setFlags([
         { level: "warning", condition: "Possible Anemia", reason: "Hemoglobin (10.2 g/dL) is below the normal range of 12–16 g/dL. Ferritin is also low.", action: "Consult your doctor. Increase iron-rich foods and discuss supplementation." },
@@ -1464,6 +2027,7 @@ function Profile({ user, onLogout }) {
 }
 
 /* ─────────────────────────── SHELL / APP ─────────────────────────────────── */
+
 const NAV = [
   { id: "dashboard", label: "Overview",      icon: "home" },
   { id: "symptoms",  label: "Symptoms",      icon: "clipboard" },
@@ -1475,21 +2039,42 @@ const NAV = [
 
 export default function App() {
   const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem("user")); } catch { return null; } });
+  
   const [page, setPage] = useState("dashboard");
   const [toast, setToast] = useState(null);
-
+const [bodyLocation, setBodyLocation] = useState("");
+  const [timeOfDay, setTimeOfDay] = useState("");
+  
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3200);
   };
+  
+
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setUser(null);
   };
+  const [darkMode, setDarkMode] = useState(
+  localStorage.getItem("theme") === "dark"
+  );
+  useEffect(() => {
+  document.body.classList.toggle("dark", darkMode);
+  }, [darkMode]);
+  
+  useEffect(() => {
+  if (darkMode) {
+    document.body.classList.add("dark");
+    localStorage.setItem("theme", "dark");
+  } else {
+    document.body.classList.remove("dark");
+    localStorage.setItem("theme", "light");
+  }
+}, [darkMode]);
 
-  if (!user) return <AuthPage onLogin={u => setUser(u)} />;
+  if (!user) return <AuthPage onLogin={u => setUser(u)} darkMode={darkMode} />;
 
   const pages = {
     dashboard: <Dashboard user={user} />,
@@ -1506,12 +2091,16 @@ export default function App() {
       <div className="app-shell">
         {/* Topbar */}
         <header className="topbar">
-          <Logo />
+          <Logo darkMode={darkMode} />
           <div className="flex-center gap12">
+            <button onClick={() => setDarkMode(d => !d)} style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--cream-dark)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <Icon name={darkMode ? "sun" : "moon"} size={15} color="var(--text-mid)" />
+            </button>
             <span style={{ fontSize: 13, color: "var(--text-soft)" }}>{user?.name}</span>
             <div className="avatar">{(user?.name || "U")[0].toUpperCase()}</div>
           </div>
         </header>
+
 
         <div className="body-area">
           {/* Sidebar */}

@@ -5,12 +5,20 @@ Flask + SQLite  |  Run: python app.py
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+
 import sqlite3, hashlib, uuid, json, os, re
 from datetime import datetime, timedelta
 from functools import wraps
+import jwt
+from google.oauth2 import id_token
+from google.auth.transport import requests
+import uuid
+uid = str(uuid.uuid4())
+sid = str(uuid.uuid4())
 
+SECRET_KEY = "this_is_a_super_long_secret_key_123456789"   # simple for now
 app = Flask(__name__)
-CORS(app, origins="*")
+CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 
 DB = "herbalance.db"
 
@@ -35,14 +43,14 @@ def init_db():
         );
 
         CREATE TABLE IF NOT EXISTS symptoms (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id     TEXT NOT NULL,
-            date        TEXT NOT NULL,
-            symptoms    TEXT NOT NULL,
-            intensity   INTEGER CHECK(intensity BETWEEN 1 AND 5),
-            notes       TEXT,
-            created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id)
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            date TEXT,
+            symptom TEXT,
+            intensity INTEGER,
+            notes TEXT,
+            body_location TEXT,
+            time_of_day TEXT
         );
 
         CREATE TABLE IF NOT EXISTS cycles (
@@ -82,26 +90,48 @@ def init_db():
 
 # ─────────────────────────────── AUTH HELPERS ─────────────────────────────────
 
-TOKENS = {}  # simple in-memory token store (replace with JWT in production)
+ # simple in-memory token store (replace with JWT in production)
+
+import bcrypt
 
 def hash_password(pw):
-    return hashlib.sha256(pw.encode()).hexdigest()
+    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+
+def check_password(pw, hashed):
+    return bcrypt.checkpw(pw.encode(), hashed.encode())
 
 def generate_token(user_id):
-    token = str(uuid.uuid4())
-    TOKENS[token] = user_id
-    return token
+    payload = {
+        "user_id": user_id,
+        "exp": datetime.utcnow() + timedelta(days=7)
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
 def require_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         auth = request.headers.get("Authorization", "")
+
+        if not auth:
+            return jsonify({"error": "Authorization header missing"}), 401
+
         token = auth.replace("Bearer ", "").strip()
-        user_id = TOKENS.get(token)
-        if not user_id:
-            return jsonify({"error": "Unauthorized"}), 401
+
+        if not token:
+            return jsonify({"error": "Token missing"}), 401
+
+        try:
+            data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            user_id = data["user_id"]
+        except jwt.ExpiredSignatureError:
+            return jsonify({"error": "Token expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"error": "Invalid token"}), 401
+
         return f(user_id, *args, **kwargs)
+
     return decorated
+    
 
 # ─────────────────────────────── AUTH ROUTES ──────────────────────────────────
 
@@ -119,7 +149,6 @@ def signup():
     if len(pw) < 6:
         return jsonify({"error": "Password must be at least 6 characters"}), 400
 
-    uid = str(uuid.uuid4())
     try:
         with get_db() as conn:
             conn.execute(
@@ -142,11 +171,11 @@ def login():
 
     with get_db() as conn:
         row = conn.execute(
-            "SELECT * FROM users WHERE email=? AND password=?",
-            (email, hash_password(pw))
-        ).fetchone()
+        "SELECT * FROM users WHERE email=?",
+        (email,)
+    ).fetchone()
 
-    if not row:
+    if not row or not check_password(pw, row["password"]):
         return jsonify({"error": "Invalid email or password"}), 401
 
     token = generate_token(row["id"])
@@ -164,7 +193,7 @@ def dashboard(user_id):
         cycles     = conn.execute("SELECT cycle_length FROM cycles WHERE user_id=? ORDER BY created_at DESC LIMIT 5", (user_id,)).fetchall()
         avg_cycle  = int(sum(c["cycle_length"] for c in cycles) / len(cycles)) if cycles else 28
         recent_sym = conn.execute(
-            "SELECT date, symptoms, intensity FROM symptoms WHERE user_id=? ORDER BY date DESC LIMIT 5",
+            "SELECT date, symptom, intensity FROM symptoms WHERE user_id=? ORDER BY date DESC LIMIT 5",
             (user_id,)
         ).fetchall()
         last_report = conn.execute(
@@ -183,7 +212,59 @@ def dashboard(user_id):
         "recent_symptoms": [dict(r) for r in recent_sym],
         "flags": flags[:3],
     })
+@app.route("/api/google-login", methods=["POST"])
+def google_login():
+    google_token = request.json.get("token")
 
+    if not google_token:
+        return jsonify({"error": "No token provided"}), 401
+
+    try:
+        
+        import requests as req
+        response = req.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {google_token}"}
+        )
+
+        if response.status_code != 200:
+            return jsonify({"error": "Invalid Google token"}), 401
+
+        user_info = response.json()
+
+        email = user_info.get("email")
+        name = user_info.get("name", "User")
+
+        if not email:
+            return jsonify({"error": "Email not found"}), 401
+
+    except Exception as e:
+        print("Google error:", e)
+        return jsonify({"error": "Google verification failed"}), 401
+
+    # ✅ Check or create user
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+
+        if row:
+            user_id = row["id"]
+        else:
+            conn.execute(
+                "INSERT INTO users (id, name, email, password) VALUES (?, ?, ?, ?)",
+                (user_id, name, email, "google_auth")
+            )
+
+    # ✅ Generate JWT
+    jwt_token = generate_token(user_id)
+
+    return jsonify({
+        "token": jwt_token,
+        "user": {
+            "id": user_id,
+            "name": name,
+            "email": email
+        }
+    })
 # ─────────────────────────────── SYMPTOMS ─────────────────────────────────────
 
 @app.route("/api/symptoms", methods=["GET", "POST"])
@@ -192,25 +273,38 @@ def symptoms(user_id):
     if request.method == "GET":
         with get_db() as conn:
             rows = conn.execute(
-                "SELECT * FROM symptoms WHERE user_id=? ORDER BY date DESC LIMIT 30", (user_id,)
+                "SELECT * FROM symptoms WHERE user_id=? ORDER BY date DESC LIMIT 30",
+                (user_id,)
             ).fetchall()
         return jsonify({"symptoms": [dict(r) for r in rows]})
 
-    data      = request.json or {}
-    date      = data.get("date", datetime.today().date().isoformat())
-    sym_text  = data.get("symptoms", "")
-    intensity = int(data.get("intensity", 3))
-    notes     = data.get("notes", "")
+    # ✅ CLEAN + CONSISTENT
+    data = request.json or {}
 
-    if not sym_text:
+    date = data.get("date", datetime.today().date().isoformat())
+    symptom = data.get("symptoms", "")   # frontend sends "symptoms"
+    intensity = int(data.get("intensity") or  3)
+    notes = data.get("notes", "")
+    body_location = data.get("body_location")
+    time_of_day = data.get("time_of_day")
+
+    if not symptom:
         return jsonify({"error": "Symptoms are required"}), 400
 
+    import uuid
+    sid = str(uuid.uuid4())   # ✅ FIX
     with get_db() as conn:
         conn.execute(
-            "INSERT INTO symptoms (user_id,date,symptoms,intensity,notes) VALUES (?,?,?,?,?)",
-            (user_id, date, sym_text, intensity, notes)
+            """
+            INSERT INTO symptoms 
+            (id, user_id, date, symptom, intensity, notes, body_location, time_of_day)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (sid, user_id, date, symptom, intensity, notes, body_location, time_of_day)
         )
+
     return jsonify({"message": "Symptoms logged"}), 201
+
 
 # ─────────────────────────────── CYCLE ────────────────────────────────────────
 
