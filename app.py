@@ -14,7 +14,7 @@ import re
 from datetime import datetime, timedelta
 from functools import wraps
 import jwt
-import bcrypt
+from werkzeug.security import generate_password_hash, check_password_hash
 import requests as req
 
 SECRET_KEY = "this_is_a_super_long_secret_key_123456789"
@@ -95,12 +95,10 @@ def init_db():
 init_db()
 
 # ─────────────────────────────── AUTH HELPERS ─────────────────────────────────
-
 def hash_password(pw):
-    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
-
+    return generate_password_hash(pw)
 def check_password(pw, hashed):
-    return bcrypt.checkpw(pw.encode(), hashed.encode())
+    return check_password_hash(hashed, pw)
 
 def generate_token(user_id):
     payload = {
