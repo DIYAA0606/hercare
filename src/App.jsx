@@ -14,7 +14,7 @@ import { useGoogleLogin } from "@react-oauth/google";
 const API =
   window.location.hostname === "localhost"
     ? "http://localhost:5000"
-    : "https://dis-mini-project-herhealth.onrender.com";
+    : "https://hercare-euou.onrender.com";
 
 /* ─────────────────────────── GLOBAL STYLES ─────────────────────────── */
 const GlobalStyles = () => (
