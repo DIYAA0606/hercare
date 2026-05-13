@@ -11,9 +11,10 @@ import html2canvas from "html2canvas";
 
 // import { GoogleLogin } from "@react-oauth/google";
 import { useGoogleLogin } from "@react-oauth/google";
-
-const API = "http://localhost:5000";
-
+const API =
+  window.location.hostname === "localhost"
+    ? "http://localhost:5000"
+    : "";
 
 /* ─────────────────────────── GLOBAL STYLES ─────────────────────────── */
 const GlobalStyles = () => (

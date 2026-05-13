@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 
-const API = "http://localhost:5000";
+const API =
+  window.location.hostname === "localhost"
+    ? "http://localhost:5000"
+    : "";
 
 const theme = {
   pink: "#F472B6",
