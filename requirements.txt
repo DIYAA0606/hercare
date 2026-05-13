@@ -1,2 +1,7 @@
-flask==3.0.3
-flask-cors==4.0.1
+Flask
+flask-cors
+bcrypt
+PyJWT
+requests
+python-dotenv
+gunicorn

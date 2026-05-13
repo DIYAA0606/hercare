@@ -6,6 +6,7 @@ Flask + SQLite  |  Run: python app.py
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
+import os
 import sqlite3, hashlib, uuid, json, os, re
 from datetime import datetime, timedelta
 from functools import wraps
@@ -20,7 +21,7 @@ SECRET_KEY = "this_is_a_super_long_secret_key_123456789"   # simple for now
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 
-DB = "herbalance.db"
+DB_NAME = os.path.join("/tmp", "herbalance.db")
 
 # ─────────────────────────────── DATABASE ────────────────────────────────────
 
@@ -456,6 +457,4 @@ def health_flags(user_id):
 # ─────────────────────────────── MAIN ─────────────────────────────────────────
 
 if __name__ == "__main__":
-    init_db()
-    print("🌸 HerBalance backend running on http://localhost:5000")
-    app.run(debug=True, port=5000)
+    app.run()
