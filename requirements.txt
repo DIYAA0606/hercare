@@ -5,3 +5,4 @@ PyJWT
 requests
 python-dotenv
 gunicorn
+google-auth
