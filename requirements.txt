@@ -1,8 +1,8 @@
 Flask
 flask-cors
-bcrypt
 PyJWT
-requests
-python-dotenv
-gunicorn
 google-auth
+google-auth-oauthlib
+google-auth-httplib2
+requests
+gunicorn
