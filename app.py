@@ -1,103 +1,154 @@
 """
 HerBalance – Women's Hormonal Health Backend
-Flask + SQLite  |  Run: python app.py
+Flask + PostgreSQL | Deployed on Render
+
+CHANGES FROM ORIGINAL:
+  - Replaced SQLite with PostgreSQL (psycopg2)
+  - SECRET_KEY now read from environment variable
+  - DATABASE_URL read from environment variable (set by Render automatically)
+  - All queries rewritten for psycopg2 cursor style
+  - Placeholder syntax changed from ? (SQLite) to %s (PostgreSQL)
+  - AUTOINCREMENT changed to SERIAL (PostgreSQL syntax)
+  - psycopg2.extras.RealDictCursor used so row["column"] still works everywhere
+  - psycopg2.errors.UniqueViolation used instead of sqlite3.IntegrityError
+  - Dynamic INSERT for lab_reports rebuilt for psycopg2 placeholder style
 """
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
-import sqlite3
-import hashlib
 import uuid
-import json
-import re
 from datetime import datetime, timedelta
 from functools import wraps
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 import requests as req
+import psycopg2
+import psycopg2.extras
+import psycopg2.errors
 
-SECRET_KEY = "this_is_a_super_long_secret_key_123456789"
+# ─────────────────────────────── CONFIG ──────────────────────────────────────
+#
+# WHY: SECRET_KEY must NEVER be hardcoded in source code.
+#      Anyone who reads your GitHub repo can forge JWT tokens and log in as any user.
+#      Set this in Render → your service → Environment → SECRET_KEY
+#
+# HOW to generate a good secret key (run once in your terminal):
+#      python -c "import secrets; print(secrets.token_hex(32))"
+#
+SECRET_KEY   = os.environ.get("SECRET_KEY", "change-this-in-production")
+
+#
+# WHY: DATABASE_URL is automatically injected by Render when you link
+#      a PostgreSQL database to your service. You do NOT need to set this manually.
+#      It looks like: postgresql://user:password@host:port/dbname
+#
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
 app = Flask(__name__)
 CORS(app)
 
-DB_NAME = "/tmp/herbalance.db"
-
 # ─────────────────────────────── DATABASE ────────────────────────────────────
-
+#
+# WHY psycopg2 instead of sqlite3:
+#   - SQLite stored a file at /tmp/herbalance.db on Render
+#   - Render's /tmp is WIPED on every restart, redeploy, or sleep/wake cycle
+#   - PostgreSQL is a real server that persists data permanently
+#
+# HOW get_db() works:
+#   - Opens a new connection to PostgreSQL using DATABASE_URL
+#   - Returns that connection
+#   - Each route opens a connection, uses it, then closes it
+#   - This is safe for Render's free tier (no connection pooling needed yet)
+#
 def get_db():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
 
+
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
+    """
+    Creates all tables if they don't exist yet.
+    Called once when the app starts.
+    Safe to run multiple times — IF NOT EXISTS prevents errors.
+
+    KEY DIFFERENCES from SQLite version:
+      - "INTEGER PRIMARY KEY AUTOINCREMENT" → "SERIAL PRIMARY KEY" (PostgreSQL syntax)
+      - Placeholder for values is %s in psycopg2, not ? like in SQLite
+    """
+    conn = psycopg2.connect(DATABASE_URL)
     c = conn.cursor()
 
     c.execute("""
     CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        email TEXT UNIQUE,
-        password TEXT,
-        age INTEGER,
-        conditions TEXT
+        id          TEXT PRIMARY KEY,
+        name        TEXT,
+        email       TEXT UNIQUE,
+        password    TEXT,
+        age         INTEGER,
+        conditions  TEXT
     )
     """)
 
     c.execute("""
     CREATE TABLE IF NOT EXISTS symptoms (
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        date TEXT,
-        symptom TEXT,
-        intensity INTEGER,
-        notes TEXT,
+        id            TEXT PRIMARY KEY,
+        user_id       TEXT,
+        date          TEXT,
+        symptom       TEXT,
+        intensity     INTEGER,
+        notes         TEXT,
         body_location TEXT,
-        time_of_day TEXT
+        time_of_day   TEXT
     )
     """)
 
+    # NOTE: SERIAL = auto-incrementing integer in PostgreSQL (replaces AUTOINCREMENT)
     c.execute("""
     CREATE TABLE IF NOT EXISTS cycles (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT,
-        last_period_date TEXT,
-        cycle_length INTEGER DEFAULT 28,
-        period_duration INTEGER DEFAULT 5,
-        flow TEXT,
-        notes TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        id                 SERIAL PRIMARY KEY,
+        user_id            TEXT,
+        last_period_date   TEXT,
+        cycle_length       INTEGER DEFAULT 28,
+        period_duration    INTEGER DEFAULT 5,
+        flow               TEXT,
+        notes              TEXT,
+        created_at         TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     c.execute("""
     CREATE TABLE IF NOT EXISTS lab_reports (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT,
-        test_date TEXT,
-        hemoglobin REAL,
-        tsh REAL,
-        t3 REAL,
-        t4 REAL,
-        ferritin REAL,
-        vitamin_d REAL,
+        id           SERIAL PRIMARY KEY,
+        user_id      TEXT,
+        test_date    TEXT,
+        hemoglobin   REAL,
+        tsh          REAL,
+        t3           REAL,
+        t4           REAL,
+        ferritin     REAL,
+        vitamin_d    REAL,
         testosterone REAL,
-        lh REAL,
-        fsh REAL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        lh           REAL,
+        fsh          REAL,
+        created_at   TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     conn.commit()
     conn.close()
+    print("Database initialised.")
+
 
 init_db()
 
+
 # ─────────────────────────────── AUTH HELPERS ─────────────────────────────────
+
 def hash_password(pw):
     return generate_password_hash(pw)
-def check_password(pw, hashed):
+
+def check_pw(pw, hashed):
     return check_password_hash(hashed, pw)
 
 def generate_token(user_id):
@@ -108,6 +159,11 @@ def generate_token(user_id):
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
 def require_auth(f):
+    """
+    Decorator that checks the Authorization: Bearer <token> header.
+    If valid, calls the route function with user_id as first argument.
+    If invalid or missing, returns 401.
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
         auth = request.headers.get("Authorization", "")
@@ -117,7 +173,7 @@ def require_auth(f):
         if not token:
             return jsonify({"error": "Token missing"}), 401
         try:
-            data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            data    = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
             user_id = data["user_id"]
         except jwt.ExpiredSignatureError:
             return jsonify({"error": "Token expired"}), 401
@@ -125,6 +181,7 @@ def require_auth(f):
             return jsonify({"error": "Invalid token"}), 401
         return f(user_id, *args, **kwargs)
     return decorated
+
 
 # ─────────────────────────────── AUTH ROUTES ──────────────────────────────────
 
@@ -145,12 +202,20 @@ def signup():
     uid = str(uuid.uuid4())
 
     try:
-        with get_db() as conn:
-            conn.execute(
-                "INSERT INTO users (id, name, email, password, age, conditions) VALUES (?,?,?,?,?,?)",
-                (uid, name, email, hash_password(pw), age, cond)
-            )
-    except sqlite3.IntegrityError:
+        # HOW: Open connection, get cursor with RealDictCursor so rows behave like dicts
+        conn = get_db()
+        c    = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # NOTE: psycopg2 uses %s for ALL placeholders, not ? like SQLite
+        c.execute(
+            "INSERT INTO users (id, name, email, password, age, conditions) VALUES (%s,%s,%s,%s,%s,%s)",
+            (uid, name, email, hash_password(pw), age, cond)
+        )
+        conn.commit()   # ← IMPORTANT: psycopg2 does NOT auto-commit; you must call this
+        conn.close()
+
+    except psycopg2.errors.UniqueViolation:
+        # This is the psycopg2 equivalent of sqlite3.IntegrityError for UNIQUE constraint
         return jsonify({"error": "Email already registered"}), 409
 
     token = generate_token(uid)
@@ -164,17 +229,24 @@ def login():
     email = data.get("email", "").strip().lower()
     pw    = data.get("password", "")
 
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE email=?", (email,)
-        ).fetchone()
+    conn = get_db()
+    c    = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    c.execute("SELECT * FROM users WHERE email=%s", (email,))
+    row = c.fetchone()
+    conn.close()
 
-    if not row or not check_password(pw, row["password"]):
+    # row is now a dict (or None), so row["password"] works just like before
+    if not row or not check_pw(pw, row["password"]):
         return jsonify({"error": "Invalid email or password"}), 401
 
     token = generate_token(row["id"])
-    user  = {"id": row["id"], "name": row["name"], "email": row["email"],
-             "age": row["age"], "conditions": row["conditions"]}
+    user  = {
+        "id":         row["id"],
+        "name":       row["name"],
+        "email":      row["email"],
+        "age":        row["age"],
+        "conditions": row["conditions"]
+    }
     return jsonify({"token": token, "user": user})
 
 
@@ -192,49 +264,77 @@ def google_login():
         if response.status_code != 200:
             return jsonify({"error": "Invalid Google token"}), 401
         user_info = response.json()
-        email = user_info.get("email")
-        name  = user_info.get("name", "User")
+        email     = user_info.get("email")
+        name      = user_info.get("name", "User")
         if not email:
             return jsonify({"error": "Email not found"}), 401
     except Exception as e:
         print("Google error:", e)
         return jsonify({"error": "Google verification failed"}), 401
 
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
-        if row:
-            user_id = row["id"]
-        else:
-            user_id = str(uuid.uuid4())
-            conn.execute(
-                "INSERT INTO users (id, name, email, password) VALUES (?, ?, ?, ?)",
-                (user_id, name, email, "google_auth")
-            )
+    conn = get_db()
+    c    = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    c.execute("SELECT * FROM users WHERE email=%s", (email,))
+    row = c.fetchone()
+
+    if row:
+        user_id = row["id"]
+    else:
+        user_id = str(uuid.uuid4())
+        c.execute(
+            "INSERT INTO users (id, name, email, password) VALUES (%s, %s, %s, %s)",
+            (user_id, name, email, "google_auth")
+        )
+
+    conn.commit()
+    conn.close()
 
     token = generate_token(user_id)
     return jsonify({"token": token, "user": {"id": user_id, "name": name, "email": email}})
+
 
 # ─────────────────────────────── DASHBOARD ────────────────────────────────────
 
 @app.route("/api/dashboard", methods=["GET"])
 @require_auth
 def dashboard(user_id):
-    with get_db() as conn:
-        sym_count  = conn.execute("SELECT COUNT(*) FROM symptoms WHERE user_id=?", (user_id,)).fetchone()[0]
-        report_cnt = conn.execute("SELECT COUNT(*) FROM lab_reports WHERE user_id=?", (user_id,)).fetchone()[0]
-        cycles     = conn.execute(
-            "SELECT cycle_length FROM cycles WHERE user_id=? ORDER BY created_at DESC LIMIT 5", (user_id,)
-        ).fetchall()
-        avg_cycle  = int(sum(c["cycle_length"] for c in cycles) / len(cycles)) if cycles else 28
-        recent_sym = conn.execute(
-            "SELECT date, symptom, intensity FROM symptoms WHERE user_id=? ORDER BY date DESC LIMIT 5",
-            (user_id,)
-        ).fetchall()
-        last_report = conn.execute(
-            "SELECT * FROM lab_reports WHERE user_id=? ORDER BY test_date DESC LIMIT 1", (user_id,)
-        ).fetchone()
+    conn = get_db()
+    c    = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    flags = _compute_flags(dict(last_report) if last_report else {}, [dict(c) for c in cycles])
+    # COUNT queries return a single tuple, not a dict, so we use a plain cursor for those
+    # Actually RealDictCursor returns {"count": N} for COUNT(*), so we access by key
+    c.execute("SELECT COUNT(*) AS cnt FROM symptoms WHERE user_id=%s",   (user_id,))
+    sym_count  = c.fetchone()["cnt"]
+
+    c.execute("SELECT COUNT(*) AS cnt FROM lab_reports WHERE user_id=%s", (user_id,))
+    report_cnt = c.fetchone()["cnt"]
+
+    c.execute(
+        "SELECT cycle_length FROM cycles WHERE user_id=%s ORDER BY created_at DESC LIMIT 5",
+        (user_id,)
+    )
+    cycles    = c.fetchall()   # list of dicts: [{"cycle_length": 28}, ...]
+    avg_cycle = int(sum(row["cycle_length"] for row in cycles) / len(cycles)) if cycles else 28
+
+    c.execute(
+        "SELECT date, symptom, intensity FROM symptoms WHERE user_id=%s ORDER BY date DESC LIMIT 5",
+        (user_id,)
+    )
+    recent_sym = c.fetchall()
+
+    c.execute(
+        "SELECT * FROM lab_reports WHERE user_id=%s ORDER BY test_date DESC LIMIT 1",
+        (user_id,)
+    )
+    last_report = c.fetchone()
+
+    conn.close()
+
+    flags = _compute_flags(
+        dict(last_report) if last_report else {},
+        [dict(r) for r in cycles]
+    )
 
     return jsonify({
         "stats": {
@@ -247,19 +347,25 @@ def dashboard(user_id):
         "flags": flags[:3],
     })
 
+
 # ─────────────────────────────── SYMPTOMS ─────────────────────────────────────
 
 @app.route("/api/symptoms", methods=["GET", "POST"])
 @require_auth
 def symptoms(user_id):
+
     if request.method == "GET":
-        with get_db() as conn:
-            rows = conn.execute(
-                "SELECT * FROM symptoms WHERE user_id=? ORDER BY date DESC LIMIT 30",
-                (user_id,)
-            ).fetchall()
+        conn = get_db()
+        c    = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        c.execute(
+            "SELECT * FROM symptoms WHERE user_id=%s ORDER BY date DESC LIMIT 30",
+            (user_id,)
+        )
+        rows = c.fetchall()
+        conn.close()
         return jsonify({"symptoms": [dict(r) for r in rows]})
 
+    # POST
     data          = request.json or {}
     date          = data.get("date", datetime.today().date().isoformat())
     symptom       = data.get("symptoms", "")
@@ -271,29 +377,38 @@ def symptoms(user_id):
     if not symptom:
         return jsonify({"error": "Symptoms are required"}), 400
 
-    sid = str(uuid.uuid4())
-    with get_db() as conn:
-        conn.execute(
-            """INSERT INTO symptoms
-               (id, user_id, date, symptom, intensity, notes, body_location, time_of_day)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (sid, user_id, date, symptom, intensity, notes, body_location, time_of_day)
-        )
+    sid  = str(uuid.uuid4())
+    conn = get_db()
+    c    = conn.cursor()
+    c.execute(
+        """INSERT INTO symptoms
+           (id, user_id, date, symptom, intensity, notes, body_location, time_of_day)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+        (sid, user_id, date, symptom, intensity, notes, body_location, time_of_day)
+    )
+    conn.commit()
+    conn.close()
     return jsonify({"message": "Symptoms logged"}), 201
+
 
 # ─────────────────────────────── CYCLE ────────────────────────────────────────
 
 @app.route("/api/cycle", methods=["GET", "POST"])
 @require_auth
 def cycle(user_id):
+
     if request.method == "GET":
-        with get_db() as conn:
-            rows = conn.execute(
-                "SELECT * FROM cycles WHERE user_id=? ORDER BY last_period_date DESC LIMIT 12",
-                (user_id,)
-            ).fetchall()
+        conn = get_db()
+        c    = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        c.execute(
+            "SELECT * FROM cycles WHERE user_id=%s ORDER BY last_period_date DESC LIMIT 12",
+            (user_id,)
+        )
+        rows = c.fetchall()
+        conn.close()
         return jsonify({"cycles": [dict(r) for r in rows]})
 
+    # POST
     data  = request.json or {}
     lpd   = data.get("last_period_date")
     cl    = int(data.get("cycle_length", 28))
@@ -304,12 +419,16 @@ def cycle(user_id):
     if not lpd:
         return jsonify({"error": "Last period date is required"}), 400
 
-    with get_db() as conn:
-        conn.execute(
-            "INSERT INTO cycles (user_id, last_period_date, cycle_length, period_duration, flow, notes) VALUES (?,?,?,?,?,?)",
-            (user_id, lpd, cl, pd, flow, notes)
-        )
+    conn = get_db()
+    c    = conn.cursor()
+    c.execute(
+        "INSERT INTO cycles (user_id, last_period_date, cycle_length, period_duration, flow, notes) VALUES (%s,%s,%s,%s,%s,%s)",
+        (user_id, lpd, cl, pd, flow, notes)
+    )
+    conn.commit()
+    conn.close()
     return jsonify({"message": "Cycle logged"}), 201
+
 
 # ─────────────────────────────── LAB REPORTS ──────────────────────────────────
 
@@ -318,29 +437,46 @@ LAB_FIELDS = ["hemoglobin", "tsh", "t3", "t4", "ferritin", "vitamin_d", "testost
 @app.route("/api/reports", methods=["GET", "POST"])
 @require_auth
 def reports(user_id):
+
     if request.method == "GET":
-        with get_db() as conn:
-            rows = conn.execute(
-                "SELECT * FROM lab_reports WHERE user_id=? ORDER BY test_date DESC LIMIT 10",
-                (user_id,)
-            ).fetchall()
+        conn = get_db()
+        c    = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        c.execute(
+            "SELECT * FROM lab_reports WHERE user_id=%s ORDER BY test_date DESC LIMIT 10",
+            (user_id,)
+        )
+        rows = c.fetchall()
+        conn.close()
         return jsonify({"reports": [dict(r) for r in rows]})
 
-    data     = request.json or {}
-    td       = data.get("test_date", datetime.today().date().isoformat())
-    vals     = {f: data.get(f) for f in LAB_FIELDS}
-    present  = [f for f in LAB_FIELDS if vals[f] is not None]
+    # POST — dynamic INSERT: only include fields the user actually submitted
+    data    = request.json or {}
+    td      = data.get("test_date", datetime.today().date().isoformat())
+    vals    = {f: data.get(f) for f in LAB_FIELDS}
+    present = [f for f in LAB_FIELDS if vals[f] is not None]
+
     cols     = ", ".join(["user_id", "test_date"] + present)
-    phold    = ", ".join(["?"] * (2 + len(present)))
+    # NOTE: psycopg2 uses %s not ?, so we build the placeholders differently
+    phold    = ", ".join(["%s"] * (2 + len(present)))
     row_vals = [user_id, td] + [vals[f] for f in present]
 
-    with get_db() as conn:
-        conn.execute(f"INSERT INTO lab_reports ({cols}) VALUES ({phold})", row_vals)
+    conn = get_db()
+    c    = conn.cursor()
+    c.execute(f"INSERT INTO lab_reports ({cols}) VALUES ({phold})", row_vals)
+    conn.commit()
+    conn.close()
     return jsonify({"message": "Report saved"}), 201
+
 
 # ─────────────────────────────── HEALTH FLAGS ─────────────────────────────────
 
 def _compute_flags(report: dict, cycles: list) -> list:
+    """
+    Pure function — takes a report dict and list of cycle dicts,
+    returns a list of flag dicts.
+    No DB access here; called from dashboard() and health_flags().
+    Unchanged from original.
+    """
     flags = []
 
     hb  = report.get("hemoglobin")
@@ -349,7 +485,8 @@ def _compute_flags(report: dict, cycles: list) -> list:
         flags.append({
             "level":     "warning",
             "condition": "Possible Anemia",
-            "reason":    f"Hemoglobin ({hb} g/dL) is below the normal range of 12–16 g/dL." + (f" Ferritin also low ({fer} ng/mL)." if fer and float(fer) < 12 else ""),
+            "reason":    f"Hemoglobin ({hb} g/dL) is below the normal range of 12–16 g/dL."
+                         + (f" Ferritin also low ({fer} ng/mL)." if fer and float(fer) < 12 else ""),
             "action":    "Consult your doctor. Increase iron-rich foods (spinach, lentils). Consider iron supplements if advised.",
         })
 
@@ -407,18 +544,30 @@ def _compute_flags(report: dict, cycles: list) -> list:
 @app.route("/api/health-flags", methods=["GET"])
 @require_auth
 def health_flags(user_id):
-    with get_db() as conn:
-        last_report = conn.execute(
-            "SELECT * FROM lab_reports WHERE user_id=? ORDER BY test_date DESC LIMIT 1", (user_id,)
-        ).fetchone()
-        cycles = conn.execute(
-            "SELECT cycle_length FROM cycles WHERE user_id=? ORDER BY created_at DESC LIMIT 6", (user_id,)
-        ).fetchall()
+    conn = get_db()
+    c    = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    flags = _compute_flags(dict(last_report) if last_report else {}, [dict(c) for c in cycles])
+    c.execute(
+        "SELECT * FROM lab_reports WHERE user_id=%s ORDER BY test_date DESC LIMIT 1",
+        (user_id,)
+    )
+    last_report = c.fetchone()
+
+    c.execute(
+        "SELECT cycle_length FROM cycles WHERE user_id=%s ORDER BY created_at DESC LIMIT 6",
+        (user_id,)
+    )
+    cycles = c.fetchall()
+    conn.close()
+
+    flags = _compute_flags(
+        dict(last_report) if last_report else {},
+        [dict(c) for c in cycles]
+    )
     return jsonify({"flags": flags})
+
 
 # ─────────────────────────────── MAIN ─────────────────────────────────────────
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
