@@ -19,6 +19,66 @@ sid = str(uuid.uuid4())
 
 SECRET_KEY = "this_is_a_super_long_secret_key_123456789"   # simple for now
 app = Flask(__name__)
+app = Flask(__name__)
+
+def init_db():
+    conn = sqlite3.connect("herbalance.db")
+    c = conn.cursor()
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        email TEXT UNIQUE,
+        password TEXT
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS symptoms (
+        id TEXT PRIMARY KEY,
+        user_id INTEGER,
+        date TEXT,
+        symptom TEXT,
+        intensity INTEGER,
+        notes TEXT,
+        body_location TEXT,
+        time_of_day TEXT
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS cycles (
+        id TEXT PRIMARY KEY,
+        user_id INTEGER,
+        start_date TEXT,
+        cycle_length INTEGER,
+        period_duration INTEGER,
+        flow TEXT
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS reports (
+        id TEXT PRIMARY KEY,
+        user_id INTEGER,
+        test_date TEXT,
+        hemoglobin REAL,
+        tsh REAL,
+        t3 REAL,
+        t4 REAL,
+        ferritin REAL,
+        vitamin_d REAL,
+        testosterone REAL,
+        lh REAL,
+        fsh REAL
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+init_db()
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 
 DB_NAME = os.path.join("/tmp", "herbalance.db")
@@ -30,64 +90,64 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_db():
-    with get_db() as conn:
-        conn.executescript("""
-        CREATE TABLE IF NOT EXISTS users (
-            id          TEXT PRIMARY KEY,
-            name        TEXT NOT NULL,
-            email       TEXT UNIQUE NOT NULL,
-            password    TEXT NOT NULL,
-            age         INTEGER,
-            conditions  TEXT,
-            created_at  TEXT DEFAULT CURRENT_TIMESTAMP
-        );
+# def init_db():
+#     with get_db() as conn:
+#         conn.executescript("""
+#         CREATE TABLE IF NOT EXISTS users (
+#             id          TEXT PRIMARY KEY,
+#             name        TEXT NOT NULL,
+#             email       TEXT UNIQUE NOT NULL,
+#             password    TEXT NOT NULL,
+#             age         INTEGER,
+#             conditions  TEXT,
+#             created_at  TEXT DEFAULT CURRENT_TIMESTAMP
+#         );
 
-        CREATE TABLE IF NOT EXISTS symptoms (
-            id TEXT PRIMARY KEY,
-            user_id TEXT,
-            date TEXT,
-            symptom TEXT,
-            intensity INTEGER,
-            notes TEXT,
-            body_location TEXT,
-            time_of_day TEXT
-        );
+#         CREATE TABLE IF NOT EXISTS symptoms (
+#             id TEXT PRIMARY KEY,
+#             user_id TEXT,
+#             date TEXT,
+#             symptom TEXT,
+#             intensity INTEGER,
+#             notes TEXT,
+#             body_location TEXT,
+#             time_of_day TEXT
+#         );
 
-        CREATE TABLE IF NOT EXISTS cycles (
-            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id             TEXT NOT NULL,
-            last_period_date    TEXT NOT NULL,
-            cycle_length        INTEGER DEFAULT 28,
-            period_duration     INTEGER DEFAULT 5,
-            flow                TEXT CHECK(flow IN ('light','moderate','heavy')),
-            notes               TEXT,
-            created_at          TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        );
+#         CREATE TABLE IF NOT EXISTS cycles (
+#             id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+#             user_id             TEXT NOT NULL,
+#             last_period_date    TEXT NOT NULL,
+#             cycle_length        INTEGER DEFAULT 28,
+#             period_duration     INTEGER DEFAULT 5,
+#             flow                TEXT CHECK(flow IN ('light','moderate','heavy')),
+#             notes               TEXT,
+#             created_at          TEXT DEFAULT CURRENT_TIMESTAMP,
+#             FOREIGN KEY(user_id) REFERENCES users(id)
+#         );
 
-        CREATE TABLE IF NOT EXISTS lab_reports (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id         TEXT NOT NULL,
-            test_date       TEXT NOT NULL,
-            hemoglobin      REAL,
-            tsh             REAL,
-            t3              REAL,
-            t4              REAL,
-            ferritin        REAL,
-            vitamin_d       REAL,
-            testosterone    REAL,
-            lh              REAL,
-            fsh             REAL,
-            created_at      TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        );
+#         CREATE TABLE IF NOT EXISTS lab_reports (
+#             id              INTEGER PRIMARY KEY AUTOINCREMENT,
+#             user_id         TEXT NOT NULL,
+#             test_date       TEXT NOT NULL,
+#             hemoglobin      REAL,
+#             tsh             REAL,
+#             t3              REAL,
+#             t4              REAL,
+#             ferritin        REAL,
+#             vitamin_d       REAL,
+#             testosterone    REAL,
+#             lh              REAL,
+#             fsh             REAL,
+#             created_at      TEXT DEFAULT CURRENT_TIMESTAMP,
+#             FOREIGN KEY(user_id) REFERENCES users(id)
+#         );
 
-        CREATE INDEX IF NOT EXISTS idx_sym_user ON symptoms(user_id);
-        CREATE INDEX IF NOT EXISTS idx_cyc_user ON cycles(user_id);
-        CREATE INDEX IF NOT EXISTS idx_lab_user ON lab_reports(user_id);
-        """)
-    print("✅ Database initialised.")
+#         CREATE INDEX IF NOT EXISTS idx_sym_user ON symptoms(user_id);
+#         CREATE INDEX IF NOT EXISTS idx_cyc_user ON cycles(user_id);
+#         CREATE INDEX IF NOT EXISTS idx_lab_user ON lab_reports(user_id);
+#         """)
+#     print("✅ Database initialised.")
 
 # ─────────────────────────────── AUTH HELPERS ─────────────────────────────────
 
