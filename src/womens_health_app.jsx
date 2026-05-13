@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import WomensHealthApp from './womens_health_app'
+
 const API =
   window.location.hostname === "localhost"
     ? "http://localhost:5000"
     : "https://dis-mini-project-herhealth.onrender.com";
-
+    
 const theme = {
   pink: "#F472B6",
   pinkLight: "#FDF2F8",
