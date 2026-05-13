@@ -4,25 +4,12 @@
     {
       "src": "app.py",
       "use": "@vercel/python"
-    },
-    {
-      "src": "herbalance/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
     }
   ],
-
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "app.py"
-    },
-
-    {
       "src": "/(.*)",
-      "dest": "/herbalance/$1"
+      "dest": "app.py"
     }
   ]
 }
