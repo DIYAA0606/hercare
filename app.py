@@ -471,75 +471,131 @@ def reports(user_id):
 # ─────────────────────────────── HEALTH FLAGS ─────────────────────────────────
 
 def _compute_flags(report: dict, cycles: list) -> list:
-    """
-    Pure function — takes a report dict and list of cycle dicts,
-    returns a list of flag dicts.
-    No DB access here; called from dashboard() and health_flags().
-    Unchanged from original.
-    """
     flags = []
 
+    # ── Hemoglobin ─────────────────────────────────────────────
     hb  = report.get("hemoglobin")
     fer = report.get("ferritin")
-    if hb and float(hb) < 12:
-        flags.append({
-            "level":     "warning",
-            "condition": "Possible Anemia",
-            "reason":    f"Hemoglobin ({hb} g/dL) is below the normal range of 12–16 g/dL."
-                         + (f" Ferritin also low ({fer} ng/mL)." if fer and float(fer) < 12 else ""),
-            "action":    "Consult your doctor. Increase iron-rich foods (spinach, lentils). Consider iron supplements if advised.",
-        })
 
+    if hb is not None:
+        try:
+            hb_val = float(hb)
+
+            if hb_val < 12:
+                ferritin_note = ""
+
+                if fer is not None:
+                    try:
+                        if float(fer) < 12:
+                            ferritin_note = f" Ferritin also low ({fer} ng/mL)."
+                    except:
+                        pass
+
+                flags.append({
+                    "level": "warning",
+                    "condition": "Possible Anemia",
+                    "reason": f"Hemoglobin ({hb_val} g/dL) is below normal range.{ferritin_note}",
+                    "action": "Increase iron-rich foods and consult a doctor."
+                })
+
+        except:
+            pass
+
+    # ── Thyroid ────────────────────────────────────────────────
     tsh = report.get("tsh")
-    if tsh:
-        tsh_val = float(tsh)
-        if tsh_val > 4.0:
-            flags.append({
-                "level":     "warning",
-                "condition": "Possible Hypothyroidism",
-                "reason":    f"TSH ({tsh} mIU/L) is above normal range (0.4–4.0).",
-                "action":    "Schedule a consultation with an endocrinologist.",
-            })
-        elif tsh_val < 0.4:
-            flags.append({
-                "level":     "warning",
-                "condition": "Possible Hyperthyroidism",
-                "reason":    f"TSH ({tsh} mIU/L) is below normal range (0.4–4.0).",
-                "action":    "Consult an endocrinologist. Monitor heart rate and weight.",
-            })
 
+    if tsh is not None:
+        try:
+            tsh_val = float(tsh)
+
+            if tsh_val > 4:
+                flags.append({
+                    "level": "warning",
+                    "condition": "Possible Thyroid Imbalance",
+                    "reason": f"TSH ({tsh_val}) is above normal range.",
+                    "action": "Consult an endocrinologist."
+                })
+
+            elif tsh_val < 0.4:
+                flags.append({
+                    "level": "warning",
+                    "condition": "Possible Hyperthyroidism",
+                    "reason": f"TSH ({tsh_val}) is below normal range.",
+                    "action": "Consult an endocrinologist."
+                })
+
+        except:
+            pass
+
+    # ── Vitamin D ──────────────────────────────────────────────
     vit_d = report.get("vitamin_d")
-    if vit_d and float(vit_d) < 30:
-        flags.append({
-            "level":     "info",
-            "condition": "Vitamin D Deficiency",
-            "reason":    f"Vitamin D ({vit_d} ng/mL) is below optimal range (30–100).",
-            "action":    "Increase sun exposure. Consider Vitamin D3 supplementation.",
-        })
 
-    testo  = report.get("testosterone")
-    lh_val = report.get("lh")
-    if testo and float(testo) > 70 and lh_val and float(lh_val) > 10:
-        flags.append({
-            "level":     "warning",
-            "condition": "Possible PCOS Indicator",
-            "reason":    f"Elevated Testosterone ({testo} ng/dL) with high LH ({lh_val} mIU/mL).",
-            "action":    "Consult a gynecologist. Ultrasound and further hormonal panels recommended.",
-        })
+    if vit_d is not None:
+        try:
+            vit_d_val = float(vit_d)
 
+            if vit_d_val < 30:
+                flags.append({
+                    "level": "info",
+                    "condition": "Low Vitamin D",
+                    "reason": f"Vitamin D ({vit_d_val} ng/mL) is below optimal range.",
+                    "action": "Increase sunlight exposure and consider supplements."
+                })
+
+        except:
+            pass
+
+    # ── PCOS Pattern ───────────────────────────────────────────
+    testosterone = report.get("testosterone")
+    lh = report.get("lh")
+
+    if testosterone is not None and lh is not None:
+        try:
+            if float(testosterone) > 70 and float(lh) > 10:
+                flags.append({
+                    "level": "warning",
+                    "condition": "Possible PCOS Pattern",
+                    "reason": f"High testosterone ({testosterone}) and LH ({lh}) detected.",
+                    "action": "Consult a gynecologist for further evaluation."
+                })
+
+        except:
+            pass
+
+    # ── Cycle Analysis ─────────────────────────────────────────
     if len(cycles) >= 3:
-        lengths = [c["cycle_length"] for c in cycles]
-        spread  = max(lengths) - min(lengths)
-        if spread > 7:
-            flags.append({
-                "level":     "info",
-                "condition": "Irregular Cycle Pattern",
-                "reason":    f"Your cycle lengths vary by {spread} days over the last {len(cycles)} cycles.",
-                "action":    "Log consistently and share data with your gynecologist.",
-            })
+        try:
+            lengths = [
+                float(c["cycle_length"])
+                for c in cycles
+                if c.get("cycle_length") is not None
+            ]
+
+            if len(lengths) >= 3:
+
+                spread = max(lengths) - min(lengths)
+                avg = sum(lengths) / len(lengths)
+
+                if spread > 7:
+                    flags.append({
+                        "level": "info",
+                        "condition": "Irregular Cycle Pattern",
+                        "reason": f"Cycle lengths vary by {int(spread)} days.",
+                        "action": "Track cycles consistently and consult a gynecologist if needed."
+                    })
+
+                if avg < 21:
+                    flags.append({
+                        "level": "info",
+                        "condition": "Short Cycle Pattern",
+                        "reason": f"Average cycle length is {round(avg,1)} days.",
+                        "action": "Monitor changes and consult a doctor if persistent."
+                    })
+
+        except:
+            pass
 
     return flags
-
 
 @app.route("/api/health-flags", methods=["GET"])
 @require_auth
@@ -566,7 +622,11 @@ def health_flags(user_id):
     )
     return jsonify({"flags": flags})
 
-
+@app.route("/")
+def home():
+    return {
+        "status": "Backend running successfully"
+    }
 # ─────────────────────────────── MAIN ─────────────────────────────────────────
 
 if __name__ == "__main__":

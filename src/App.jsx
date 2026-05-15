@@ -1140,13 +1140,18 @@ function HemoglobinChart({ data }) {
   const filtered = (data || []).filter(d => d.value != null);
   const chartData = filtered.length > 0
     ? filtered.map(d => ({ date: (d.date || "").slice(0, 7), value: parseFloat(d.value) }))
-    : [{ date: "Oct 1", value: 11.2 }, { date: "Jan 15", value: 11.9 }, { date: "Apr 1", value: 12.8 }];
+    : [];
   return (
     <div className="card" style={{ height: "100%" }}>
       <div className="card-body" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>Hemoglobin Trend</div>
         <div style={{ fontSize: 12, color: "var(--text-soft)", marginBottom: 14 }}>Normal range: 12.0 — 15.5 g/dL</div>
         <div style={{ flex: 1, minHeight: 200 }}>
+          {filtered.length === 0 ? (
+  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-soft)", fontSize: 13 }}>
+    No lab reports logged yet.
+  </div>
+) : (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 8, right: 16, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(160,136,152,0.15)" vertical={false} />
@@ -1158,6 +1163,7 @@ function HemoglobinChart({ data }) {
               <Line type="monotone" dataKey="value" stroke="#C9768A" strokeWidth={2.5} dot={{ r: 4, fill: "#C9768A", strokeWidth: 0 }} activeDot={{ r: 6 }} />
             </LineChart>
           </ResponsiveContainer>
+)}
         </div>
       </div>
     </div>
@@ -1192,7 +1198,11 @@ function CycleLengthChart({ data }) {
 }
 
 function SymptomHeatmap({ data }) {
-  const WEEKS = ["Feb 15","Feb 22","Mar 1","Mar 8","Mar 15","Mar 22","Mar 29","Apr 5"];
+const WEEKS = Array.from({ length: 8 }, (_, i) => {
+  const d = new Date();
+  d.setDate(d.getDate() - (7 * (7 - i)));
+  return d.toLocaleDateString("en-IN", { month: "short", day: "numeric" });
+});
   const ROWS  = ["Fatigue","Cramps","Mood Swings","Headache","Bloating","Back Pain","Breast Tenderness","Insomnia"];
   const grid  = {};
   ROWS.forEach(s => { grid[s] = {}; WEEKS.forEach(w => { grid[s][w] = 0; }); });
@@ -1203,13 +1213,7 @@ function SymptomHeatmap({ data }) {
       const wk  = WEEKS[Math.max(0, idx)];
       sym.split(", ").forEach(s => { if (grid[s] && wk) grid[s][wk] = (grid[s][wk]||0) + (entry.intensity||1); });
     });
-  } else {
-    grid["Fatigue"]["Mar 15"]=4; grid["Fatigue"]["Mar 29"]=3; grid["Fatigue"]["Apr 5"]=3;
-    grid["Cramps"]["Mar 15"]=3; grid["Cramps"]["Mar 22"]=4;
-    grid["Mood Swings"]["Mar 8"]=2; grid["Mood Swings"]["Apr 5"]=3;
-    grid["Headache"]["Mar 29"]=2; grid["Bloating"]["Apr 5"]=2;
-    grid["Breast Tenderness"]["Mar 22"]=2; grid["Insomnia"]["Mar 22"]=3;
-  }
+  } 
   const getColor = v => {
     if (!v) return "rgba(201,118,138,0.08)";
     return `rgba(201,118,138,${Math.min(0.2 + (v/5)*0.75, 1)})`;
@@ -1249,12 +1253,25 @@ function SymptomHeatmap({ data }) {
 function SymptomCycleChart({ data }) {
   const topSymptoms = ["Fatigue","Cramps","Mood Swings","Headache","Bloating"];
   const colors = ["#C9768A","#9B59B6","#3498DB","#E67E22","#27AE60"];
-  const chartData = [
-    { phase: "Menstrual",  Fatigue: 2, Cramps: 2, "Mood Swings": 0, Headache: 0, Bloating: 0 },
-    { phase: "Follicular", Fatigue: 0, Cramps: 0, "Mood Swings": 0, Headache: 0, Bloating: 0 },
-    { phase: "Ovulation",  Fatigue: 0, Cramps: 0, "Mood Swings": 1, Headache: 0, Bloating: 0 },
-    { phase: "Luteal",     Fatigue: 1, Cramps: 0, "Mood Swings": 1, Headache: 1, Bloating: 1 },
-  ];
+  const phases = ["Menstrual", "Follicular", "Ovulation", "Luteal"];
+const chartData = phases.map(phase => {
+  const row = { phase };
+  topSymptoms.forEach(s => { row[s] = 0; });
+  return row;
+});
+if (!data || data.length === 0) {
+  return (
+    <div className="card" style={{ height: "100%" }}>
+      <div className="card-body" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>Symptoms by Cycle Phase</div>
+        <div style={{ fontSize: 12, color: "var(--text-soft)", marginBottom: 14 }}>Top symptoms grouped by phase</div>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-soft)", fontSize: 13 }}>
+          Log symptoms and cycle data to see phase analysis.
+        </div>
+      </div>
+    </div>
+  );
+}
   return (
     <div className="card" style={{ height: "100%" }}>
       <div className="card-body" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -1398,13 +1415,13 @@ const exportPDF = async () => {
   <div className="report-section">
     <h2>Insights</h2>
 
-    {insights.length === 0 ? (
-      <p>No insights available</p>
-    ) : (
-      insights.map((i, idx) => (
-        <InsightCard key={idx} item={i} />
-      ))
-    )}
+    {flags.length === 0 ? (
+  <p style={{ color: "var(--text-soft)", fontSize: 13 }}>No health flags detected.</p>
+) : flags.map((f, i) => (
+  <div key={i} style={{ marginBottom: 8, fontSize: 13, padding: "10px 14px", background: "var(--rose-pale)", borderRadius: 8 }}>
+    <strong>{f.condition}:</strong> {f.reason}
+  </div>
+))}
   </div>
 
 </div>
@@ -1896,11 +1913,7 @@ function HealthFlags() {
   return r.json();
 })
       .then(d => setFlags(d.flags || []))
-      .catch(() => setFlags([
-        { level: "warning", condition: "Possible Anemia", reason: "Hemoglobin (10.2 g/dL) is below the normal range of 12–16 g/dL. Ferritin is also low.", action: "Consult your doctor. Increase iron-rich foods and discuss supplementation." },
-        { level: "warning", condition: "Thyroid Imbalance", reason: "TSH (5.8 mIU/L) is above the normal range of 0.4–4.0 mIU/L.", action: "Schedule a follow-up with an endocrinologist. Further T3/T4 tests recommended." },
-        { level: "info", condition: "Irregular Cycle Pattern", reason: "Your last 3 cycles varied by more than 7 days.", action: "Log consistently and share this data with your gynecologist." },
-      ]));
+      .catch(() => setFlags([]));
   }, []);
 
   const levelStyle = {
